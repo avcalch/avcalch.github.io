@@ -23,6 +23,9 @@
             --button-secondary-bg: #e74c3c;
             --button-secondary-color: white;
             --button-secondary-hover-bg: #c0392b;
+            --button-tertiary-bg: #6c757d; /* 새로운 버튼 색상 */
+            --button-tertiary-color: white;
+            --button-tertiary-hover-bg: #5a6268;
             --character-item-bg: #f9f9f9;
             --character-item-border: #eee;
             --simulation-output-bg: #fdfdfd;
@@ -66,6 +69,9 @@
             --button-secondary-bg: #b93f30;
             --button-secondary-color: white;
             --button-secondary-hover-bg: #9e3328;
+            --button-tertiary-bg: #4a4a4a; /* 새로운 버튼 색상 (다크모드) */
+            --button-tertiary-color: white;
+            --button-tertiary-hover-bg: #5c5c5c;
             --character-item-bg: #4a4a4a;
             --character-item-border: #5c5c5c;
             --simulation-output-bg: #3a3a3a;
@@ -99,8 +105,8 @@
             background-color: var(--body-bg);
             color: var(--text-color);
             /* 데스크톱 환경에서만 zoom 적용. 모바일에서는 viewport meta tag가 처리 */
-            zoom: 0.8; 
-            -moz-transform: scale(0.8); 
+            zoom: 0.7; 
+            -moz-transform: scale(0.7); 
             -moz-transform-origin: 0 0; 
             transition: background-color 0.3s ease, color 0.3s ease;
         }
@@ -171,6 +177,15 @@
         button.secondary:hover {
             background-color: var(--button-secondary-hover-bg);
         }
+        button.tertiary { /* 새로운 버튼 스타일 */
+            background-color: var(--button-tertiary-bg);
+            color: var(--button-tertiary-color);
+            margin-left: 10px;
+        }
+        button.tertiary:hover {
+            background-color: var(--button-tertiary-hover-bg);
+        }
+
         #characterList {
             margin-top: 20px;
             border-top: 1px solid var(--character-item-border);
@@ -432,7 +447,7 @@
                 font-size: 0.9em; /* 버튼 폰트 크기 조정 */
                 margin-left: 5px; /* 버튼 간격 조정 */
             }
-            button.secondary {
+            button.secondary, button.tertiary { /* 추가된 버튼도 모바일 마진 적용 */
                 margin-left: 5px; /* 버튼 간격 조정 */
             }
             .character-list-header {
@@ -523,6 +538,15 @@
                 width: auto; /* 내용에 맞춰 너비 조정 */
                 margin-top: 10px; /* 텍스트 아래 여백 */
             }
+            /* 이벤트 폼 내 버튼 정렬 */
+            .event-form .form-group:last-of-type + button { /* 마지막 form-group 다음 버튼들 */
+                width: 100%;
+                margin-top: 10px;
+                margin-left: 0;
+            }
+            .event-form .form-group:last-of-type + button + button { /* 적용 버튼 다음 버튼들 */
+                 margin-left: 0;
+            }
         }
     </style>
 </head>
@@ -599,6 +623,8 @@
 
         // 모든 라운드 및 턴 이벤트를 저장하는 새로운 전역 배열
         let futureEvents = JSON.parse(localStorage.getItem('futureEvents')) || []; 
+        // 시뮬레이션 종료 지점 (이벤트 추가 시 설정되며, runSimulation에 전달)
+        let simulationEndTurn = Infinity; 
 
         const BUFF_DURATION_OPTIONS = [
             { value: 0, label: "지속 시간 없음 (영구)" }, 
@@ -970,6 +996,7 @@
                 futureEvents = []; // 모든 이벤트 초기화
                 localStorage.setItem('characters', JSON.stringify(characters));
                 localStorage.setItem('futureEvents', JSON.stringify(futureEvents)); 
+                simulationEndTurn = Infinity; // 시뮬레이션 종료 지점 초기화
                 runSimulation(); 
             }
         }
@@ -1003,6 +1030,22 @@
             }
             return Math.floor((av - 150.01) / 100) + 1; 
         }
+
+        // 시뮬레이션 종료 지점까지 futureEvents를 정리하는 함수
+        function cleanUpFutureEvents() {
+            const originalFutureEventsCount = futureEvents.length;
+            futureEvents = futureEvents.filter(event => {
+                if (event.type === 'turn') {
+                    return event.turnNum <= simulationEndTurn;
+                }
+                return true; // 라운드 이벤트는 턴 수에 따라 삭제하지 않음
+            });
+            if (futureEvents.length !== originalFutureEventsCount) {
+                localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
+                console.log(`시뮬레이션 종료 지점 이후의 턴 이벤트 ${originalFutureEventsCount - futureEvents.length}개가 제거되었습니다.`);
+            }
+        }
+
 
         function runSimulation() {
             const outputDiv = document.getElementById('simulationOutput');
@@ -1061,6 +1104,14 @@
             applyFutureRoundEventsToSimState(0, outputDiv); // 0 라운드 futureEvents 적용
 
             while (turnCount < MAX_TURNS) {
+                // 시뮬레이션 강제 종료 지점에 도달하면 중단
+                if (turnCount >= simulationEndTurn) {
+                    outputDiv.innerHTML += `<div class="simulation-event">시뮬레이션이 ${turnCount}턴에서 종료되었습니다.</div>`;
+                    cleanUpFutureEvents(); // 종료된 턴 이후의 이벤트 정리
+                    simulationEndTurn = Infinity; // 다음 시뮬레이션을 위해 초기화
+                    break; 
+                }
+
                 turnCount++;
 
                 // 턴 시작 시점에 pendingBuffs를 실제 buffs로 이동하고, 지속 시간 감소
@@ -1154,6 +1205,10 @@
                         <div id="form-${turnId}" class="event-form">
                             <h3>턴 이벤트 추가</h3>
                             <div class="form-group">
+                                <label for="eventName-${turnId}">이벤트 이름 (선택 사항):</label>
+                                <input type="text" id="eventName-${turnId}" placeholder="예: '브로냐 궁극기', '적 디버프'">
+                            </div>
+                            <div class="form-group">
                                 <label>대상:</label>
                                 <select id="target-${turnId}">
                                     <option value="all">모든 캐릭터</option>
@@ -1183,6 +1238,7 @@
                             </div>
                             <button class="primary" onclick="applyTurnEvent('${turnId}', '${nextChar.id}', ${currentGlobalAV.toFixed(2)}, ${turnCount})">적용</button>
                             <button class="secondary" onclick="document.getElementById('form-${turnId}').classList.remove('active');">닫기</button>
+                            <button class="tertiary" onclick="endSimulationFromTurn(${turnCount});">이 시뮬레이션 끝내기</button>
                         </div>
                     </div>
                 `;
@@ -1199,10 +1255,20 @@
                     applyFutureEventToSimState(event, outputDiv, turnId);
                 });
             }
-            if (showRoundMarkers) {
+            if (turnCount < MAX_TURNS && showRoundMarkers) { // 최대 턴까지 가지 않았고 라운드 마커 표시 중일 때만
                 outputDiv.innerHTML += `<div class="round-marker"><span class="marker-text">${currentRound} 라운드 끝</span></div>`; 
             }
         }
+
+        // 특정 턴에서 시뮬레이션을 끝내고 futureEvents를 정리
+        function endSimulationFromTurn(turnNum) {
+            if (confirm(`${turnNum}턴 이후의 모든 시뮬레이션 결과 및 저장된 이벤트를 삭제하고 시뮬레이션을 종료하시겠습니까?`)) {
+                simulationEndTurn = turnNum; // 시뮬레이션 종료 지점 설정
+                runSimulation(); // 시뮬레이션을 다시 실행하여 해당 지점까지의 결과만 표시
+                alert(`${turnNum}턴 이후의 시뮬레이션이 종료되고, 해당 턴 이후의 이벤트가 제거되었습니다.`);
+            }
+        }
+
 
         // 라운드 이벤트 폼 보이기/숨기기
         function showRoundEventForm(event, roundNum) {
@@ -1226,6 +1292,10 @@
                 form.innerHTML = `
                     <h3>라운드 이벤트 추가</h3>
                     <input type="hidden" id="currentRoundForEvent">
+                    <div class="form-group">
+                        <label for="roundEventName">이벤트 이름 (선택 사항):</label>
+                        <input type="text" id="roundEventName" placeholder="예: '라운드 시작 버프'">
+                    </div>
                     <div class="form-group">
                         <label>대상:</label>
                         <select id="roundEventTarget">
@@ -1273,6 +1343,7 @@
                 characters.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); // 캐릭터 목록 옵션 채우기
             
             // 폼 필드 초기화
+            document.getElementById('roundEventName').value = ''; // 이벤트 이름 필드 초기화
             document.getElementById('roundEventType').value = 'gauge';
             document.getElementById('roundEventValue').value = '';
             
@@ -1286,6 +1357,7 @@
         // 라운드 이벤트 적용 (futureEvents 배열에 저장)
         function applyRoundEvent() {
             const roundNum = parseInt(document.getElementById('currentRoundForEvent').value);
+            const eventName = document.getElementById('roundEventName').value.trim(); // 이벤트 이름 가져오기
             const targetId = document.getElementById('roundEventTarget').value;
             const eventType = document.getElementById('roundEventType').value;
             let valueInput = document.getElementById('roundEventValue').value;
@@ -1319,12 +1391,15 @@
                     value: value,
                     valueType: valueType,
                     buffDuration: buffDuration,
+                    eventName: eventName // 이벤트 이름 저장
                 };
 
+                const eventNamePart = eventName ? `'${eventName}' ` : '';
+
                 if (eventType === 'gauge') {
-                    eventDescription = `라운드 ${roundNum} 시작: ${targetChar.name}에게 행동 게이지 ${value}% 증가`;
+                    eventDescription = `${eventNamePart}라운드 ${roundNum} 시작: ${targetChar.name}에게 행동 게이지 ${value}% 증가`;
                 } else if (eventType === 'speed') {
-                    eventDescription = `라운드 ${roundNum} 시작: ${targetChar.name}에게 속도 ${value}${valueType} 변동 (${buffDuration > 0 ? buffDuration + '턴 지속' : '영구'})`;
+                    eventDescription = `${eventNamePart}라운드 ${roundNum} 시작: ${targetChar.name}에게 속도 ${value}${valueType} 변동 (${buffDuration > 0 ? buffDuration + '턴 지속' : '영구'})`;
                 }
                 eventData.description = eventDescription;
                 futureEvents.push(eventData); // futureEvents 배열에 이벤트 추가
@@ -1356,7 +1431,8 @@
         // 새로운 함수: futureEvent 하나를 currentSimState에 적용하고 UI에 표시
         function applyFutureEventToSimState(event, outputDiv, uiTurnId) {
             const eventOutput = document.createElement('div');
-            eventOutput.innerHTML = event.description;
+            const eventNameDisplay = event.eventName ? ` [${event.eventName}]` : '';
+            eventOutput.innerHTML = event.description + eventNameDisplay; // 이벤트 이름 추가
             eventOutput.classList.add('event-detail');
 
             if (event.type === 'round') {
@@ -1444,6 +1520,7 @@
                 form.classList.add('active'); // 폼 활성화
 
                 // 폼 필드 초기화 및 값 설정
+                form.querySelector('[id^="eventName-"]').value = ''; // 이벤트 이름 필드 초기화
                 const targetSelect = form.querySelector('[id^="target-"]'); 
                 targetSelect.innerHTML = `<option value="all">모든 캐릭터</option>` +
                     characters.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); // 캐릭터 목록 옵션 채우기
@@ -1482,6 +1559,7 @@
             const form = document.getElementById(`form-${turnId}`); // 해당 폼 요소 가져오기
             if (!form) return;
 
+            const eventName = form.querySelector('[id^="eventName-"]').value.trim(); // 이벤트 이름 가져오기
             const targetId = form.querySelector('[id^="target-"]').value;
             const eventType = form.querySelector('[id^="eventType-"]').value;
             let valueInput = form.querySelector('[id^="value-"]').value; 
@@ -1522,16 +1600,19 @@
                     buffDuration: buffDuration, // duration 대신 buffDuration으로 일관성 유지
                     appliedAtAv: currentAv, // 이벤트 발생 시점의 AV (UI에 표시용)
                     uiTurnId: turnId, // UI에 표시될 턴의 ID
+                    eventName: eventName // 이벤트 이름 저장
                 };
+
+                const eventNamePart = eventName ? `'${eventName}' ` : '';
 
                 if (eventType === 'gauge') {
                     eventDescription = `
-                        ${actingCharName}이(가) ${targetCharOriginal.name}에게 행동 게이지 ${value}% 증가 
+                        ${eventNamePart}${actingCharName}이(가) ${targetCharOriginal.name}에게 행동 게이지 ${value}% 증가 
                         (AV: ${currentAv.toFixed(2)}, ${isHold ? '홀드 발동' : '턴 종료 후 발동'})
                     `;
                 } else if (eventType === 'speed') {
                     eventDescription = `
-                        ${actingCharName}이(가) ${targetCharOriginal.name}에게 속도 ${value}${valueType} 변동 
+                        ${eventNamePart}${actingCharName}이(가) ${targetCharOriginal.name}에게 속도 ${value}${valueType} 변동 
                         (${buffDuration > 0 ? buffDuration + '턴 지속' : '영구'}, AV: ${currentAv.toFixed(2)}, ${isHold ? '홀드 발동' : '턴 종료 후 발동'})
                     `;
                 }

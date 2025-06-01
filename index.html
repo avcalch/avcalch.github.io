@@ -6,18 +6,106 @@
     <title>행동 계산기 및 턴 시뮬레이션</title>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
     <style>
+        /* CSS 변수 정의 (라이트 모드 기본값) */
+        :root {
+            --body-bg: #f4f7f6;
+            --text-color: #333;
+            --heading-color: #2c3e50;
+            --container-bg: #fff;
+            --border-color: #ddd;
+            --shadow-color: rgba(0, 0, 0, 0.08);
+            --form-group-label-color: #333;
+            --input-bg: #fff;
+            --input-border: #ddd;
+            --button-primary-bg: #3498db;
+            --button-primary-color: white;
+            --button-primary-hover-bg: #2980b9;
+            --button-secondary-bg: #e74c3c;
+            --button-secondary-color: white;
+            --button-secondary-hover-bg: #c0392b;
+            --character-item-bg: #f9f9f9;
+            --character-item-border: #eee;
+            --simulation-output-bg: #fdfdfd;
+            --simulation-output-border: #ddd;
+            --simulation-event-border: #eee;
+            --event-detail-bg: #e8f5e9;
+            --event-detail-border: #c8e6c9;
+            --round-marker-bg: #f3e5f5;
+            --round-marker-border: #8e44ad;
+            --round-marker-text-color: #8e44ad;
+            --character-turn-bg: #e0f2f7;
+            --character-turn-border: #b3e5fc;
+            --character-turn-text-color: #3498db;
+            --event-form-bg: #f0f8ff;
+            --event-form-border: #d0e0ff;
+            --data-transfer-section-bg: #fcfcfc;
+            --data-transfer-section-border: #ccc;
+            --data-transfer-section-p-color: #666;
+            --round-toggle-btn-on-bg: #28a745;
+            --round-toggle-btn-off-bg: #dc3545;
+            --alert-round-event-bg: #ffe0b2; /* 라운드 이벤트 알림 배경색 */
+            --alert-round-event-border: #ffcc80; /* 라운드 이벤트 알림 테두리색 */
+            --sim-round-event-bg: #fff3e0; /* 시뮬레이션 내 라운드 이벤트 배경색 */
+            --sim-round-event-border: #ffcc80; /* 시뮬레이션 내 라운드 이벤트 테두리색 */
+        }
+
+        /* 다크 모드 스타일 */
+        body.dark-mode {
+            --body-bg: #2c2c2c;
+            --text-color: #e0e0e0;
+            --heading-color: #f5f5f5;
+            --container-bg: #3c3c3c;
+            --border-color: #555;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --form-group-label-color: #e0e0e0;
+            --input-bg: #4c4c4c;
+            --input-border: #666;
+            --button-primary-bg: #2a7aa0;
+            --button-primary-color: white;
+            --button-primary-hover-bg: #216382;
+            --button-secondary-bg: #b93f30;
+            --button-secondary-color: white;
+            --button-secondary-hover-bg: #9e3328;
+            --character-item-bg: #4a4a4a;
+            --character-item-border: #5c5c5c;
+            --simulation-output-bg: #3a3a3a;
+            --simulation-output-border: #555;
+            --simulation-event-border: #555;
+            --event-detail-bg: #4a5a4a;
+            --event-detail-border: #6c8a6c;
+            --round-marker-bg: #5a446a;
+            --round-marker-border: #a980c9;
+            --round-marker-text-color: #d1b4e8;
+            --character-turn-bg: #3a5a6a;
+            --character-turn-border: #6cb3cc;
+            --character-turn-text-color: #79c8ff;
+            --event-form-bg: #3a4a5a;
+            --event-form-border: #5a7a9a;
+            --data-transfer-section-bg: #333;
+            --data-transfer-section-border: #666;
+            --data-transfer-section-p-color: #bbb;
+            --round-toggle-btn-on-bg: #208a38;
+            --round-toggle-btn-off-bg: #b02c2c;
+            --alert-round-event-bg: #9a6d3c; /* 라운드 이벤트 알림 배경색 (다크모드용) */
+            --alert-round-event-border: #c98e5e; /* 라운드 이벤트 알림 테두리색 (다크모드용) */
+            --sim-round-event-bg: #8a6a4a; /* 시뮬레이션 내 라운드 이벤트 배경색 (다크모드용) */
+            --sim-round-event-border: #b89868; /* 시뮬레이션 내 라운드 이벤트 테두리색 (다크모드용) */
+        }
+
+        /* 공통 스타일: CSS 변수 사용 */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 20px;
-            background-color: #f4f7f6;
-            color: #333;
-            /* 화면 축소 설정 */
-            zoom: 0.8; /* 크롬, 엣지, 사파리에서 전체 화면을 70%로 축소 */
-            -moz-transform: scale(0.8); /* Firefox를 위한 접두사 */
-            -moz-transform-origin: 0 0; /* Firefox에서 좌상단을 기준으로 축소 */
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            /* 데스크톱 환경에서만 zoom 적용. 모바일에서는 viewport meta tag가 처리 */
+            zoom: 0.7; 
+            -moz-transform: scale(0.7); 
+            -moz-transform-origin: 0 0; 
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         h1, h2 {
-            color: #2c3e50;
+            color: var(--heading-color);
         }
         .container {
             display: flex;
@@ -25,18 +113,19 @@
             margin-top: 20px;
         }
         .character-manager, .simulation-viewer {
-            background-color: #fff;
+            background-color: var(--container-bg);
             padding: 25px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 12px var(--shadow-color);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
         .character-manager {
             flex: 1;
-            min-width: 300px;
+            min-width: 300px; /* 데스크톱에서 최소 너비 유지 */
         }
         .simulation-viewer {
             flex: 2;
-            min-width: 600px;
+            min-width: 600px; /* 데스크톱에서 최소 너비 유지 */
         }
         .form-group {
             margin-bottom: 15px;
@@ -45,15 +134,19 @@
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
+            color: var(--form-group-label-color);
         }
         .form-group input[type="text"],
         .form-group input[type="number"],
         .form-group select { 
-            width: calc(100% - 20px);
+            width: calc(100% - 20px); /* 패딩 포함 */
             padding: 10px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--input-border);
             border-radius: 4px;
             font-size: 1em;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
         button {
             padding: 10px 18px;
@@ -61,37 +154,37 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 1em;
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         button.primary {
-            background-color: #3498db;
-            color: white;
+            background-color: var(--button-primary-bg);
+            color: var(--button-primary-color);
         }
         button.primary:hover {
-            background-color: #2980b9;
+            background-color: var(--button-primary-hover-bg);
         }
         button.secondary {
-            background-color: #e74c3c;
-            color: white;
+            background-color: var(--button-secondary-bg);
+            color: var(--button-secondary-color);
             margin-left: 10px;
         }
         button.secondary:hover {
-            background-color: #c0392b;
+            background-color: var(--button-secondary-hover-bg);
         }
         #characterList {
             margin-top: 20px;
-            border-top: 1px solid #eee;
+            border-top: 1px solid var(--character-item-border);
             padding-top: 15px;
         }
-        /* 등록된 캐릭터 목록 헤더 스타일 */
         .character-list-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px; /* 목록과 헤더 사이 간격 */
+            margin-bottom: 15px;
         }
         .character-list-header h3 {
-            margin: 0; /* h3 기본 마진 제거 */
+            margin: 0;
+            color: var(--heading-color);
         }
         .character-list-header button {
             padding: 8px 15px;
@@ -99,8 +192,8 @@
         }
 
         .character-item {
-            background-color: #f9f9f9;
-            border: 1px solid #eee;
+            background-color: var(--character-item-bg);
+            border: 1px solid var(--character-item-border);
             padding: 12px;
             margin-bottom: 10px;
             border-radius: 6px;
@@ -108,6 +201,7 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         .character-item span {
             flex: 1;
@@ -119,86 +213,89 @@
             font-size: 0.9em;
         }
         .simulation-output {
-            border: 1px solid #ddd;
+            border: 1px solid var(--simulation-output-border);
             padding: 15px;
             border-radius: 6px;
-            background-color: #fdfdfd;
+            background-color: var(--simulation-output-bg);
             min-height: 400px;
             overflow-y: auto;
             max-height: 800px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         .simulation-event {
             margin-bottom: 15px;
             padding: 10px;
-            border-bottom: 1px dashed #eee;
+            border-bottom: 1px dashed var(--simulation-event-border);
+            transition: border-color 0.3s ease;
         }
         .simulation-event:last-child {
             border-bottom: none;
         }
         .event-type {
             font-weight: bold;
-            color: #27ae60;
+            color: #27ae60; /* 이 색상은 다크모드에서도 잘 보이도록 고정 */
         }
         .event-detail {
             margin-top: 5px;
             font-size: 0.95em;
-            background-color: #e8f5e9; 
+            background-color: var(--event-detail-bg); 
             padding: 8px;
             border-radius: 4px;
-            border: 1px solid #c8e6c9;
+            border: 1px solid var(--event-detail-border);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         .round-marker {
             font-weight: bold;
-            color: #8e44ad;
+            color: var(--round-marker-text-color);
             margin: 20px 0;
             padding: 5px 0;
-            border-bottom: 2px solid #8e44ad;
-            border-top: 2px solid #8e44ad;
+            border-bottom: 2px solid var(--round-marker-border);
+            border-top: 2px solid var(--round-marker-border);
             text-align: center;
-            background-color: #f3e5f5;
+            background-color: var(--round-marker-bg);
             border-radius: 4px;
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
             padding-left: 15px; 
             padding-right: 15px; 
-            flex-wrap: wrap; /* 내용이 넘칠 경우 다음 줄로 넘어가도록 */
+            flex-wrap: wrap; 
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
-        /* 라운드 마커 내 버튼과 폼을 위한 스타일 */
         .round-marker button {
             padding: 5px 10px;
             font-size: 0.8em;
             margin-left: 10px; 
         }
-        .round-marker .round-event-form-wrapper { /* 폼을 감싸는 div */
-            width: 100%; /* 폼이 라운드 마커 전체 너비를 차지하도록 */
-            padding-top: 10px; /* 버튼과 폼 사이에 간격 추가 */
-            display: flex; /* 내부 요소들을 정렬하기 위해 */
-            justify-content: center; /* 폼을 가운데 정렬 */
+        .round-marker .round-event-form-wrapper { 
+            width: 100%; 
+            padding-top: 10px; 
+            display: flex; 
+            justify-content: center; 
         }
 
         .character-turn {
             font-weight: bold;
-            color: #3498db;
+            color: var(--character-turn-text-color);
             margin-top: 10px;
             margin-bottom: 5px;
-            background-color: #e0f2f7;
+            background-color: var(--character-turn-bg);
             padding: 8px;
             border-radius: 4px;
-            border: 1px solid #b3e5fc;
+            border: 1px solid var(--character-turn-border);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
-        /* 이벤트 폼의 기본 상태는 숨김 */
         .event-form {
-            background-color: #f0f8ff;
-            border: 1px solid #d0e0ff;
+            background-color: var(--event-form-bg);
+            border: 1px solid var(--event-form-border);
             padding: 15px;
             border-radius: 6px;
-            margin-top: 15px; /* 폼이 뜨는 위치에 따라 조절 */
-            display: none; /* 기본적으로 모든 폼 숨김 */
-            width: 90%; /* 폼의 너비 조절 */
-            max-width: 500px; /* 폼의 최대 너비 제한 */
+            margin-top: 15px; 
+            display: none; 
+            width: 90%; 
+            max-width: 500px; 
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
-        /* active 클래스가 있을 때만 보이도록 */
         .event-form.active {
             display: block;
         }
@@ -213,7 +310,6 @@
             display: inline-block; 
             margin-bottom: 0;
         }
-        /* 라운드 표시 On/Off 버튼 스타일 */
         .round-toggle-container {
             display: inline-flex;
             align-items: center;
@@ -223,37 +319,219 @@
         .round-toggle-btn {
             padding: 5px 10px;
             font-size: 0.9em;
-            background-color: #6c757d;
+            background-color: #6c757d; /* 이 버튼은 다크모드/라이트모드에서 고정색 */
             color: white;
             border-radius: 4px;
             cursor: pointer;
             transition: background-color 0.3s ease;
         }
         .round-toggle-btn.on {
-            background-color: #28a745; 
+            background-color: var(--round-toggle-btn-on-bg); 
         }
         .round-toggle-btn.off {
-            background-color: #dc3545; 
+            background-color: var(--round-toggle-btn-off-bg); 
         }
 
-        /* 데이터 전송 섹션 스타일 */
         .data-transfer-section {
             margin-top: 30px;
             padding: 20px;
-            border: 1px dashed #ccc;
+            border: 1px dashed var(--data-transfer-section-border);
             border-radius: 8px;
-            background-color: #fcfcfc;
+            background-color: var(--data-transfer-section-bg);
             text-align: center;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         .data-transfer-section button {
             margin: 5px 10px;
         }
         .data-transfer-section p {
             margin-bottom: 15px;
+            color: var(--data-transfer-section-p-color);
+        }
+        /* 라운드 이벤트 알림 스타일 */
+        .simulation-output .event-detail[style*="background-color: #ffe0b2;"] { /* 라이트 모드용 선택자 */
+            background-color: var(--alert-round-event-bg) !important; 
+            border: 1px solid var(--alert-round-event-border) !important;
+        }
+        .simulation-output .event-detail[style*="background-color: #fff3e0;"] { /* 라이트 모드용 선택자 */
+            background-color: var(--sim-round-event-bg) !important; 
+            border: 1px solid var(--sim-round-event-border) !important;
+        }
+
+        /* 다크모드 토글 버튼 */
+        .dark-mode-toggle-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+        }
+        .dark-mode-toggle-btn {
+            padding: 8px 15px;
+            font-size: 0.9em;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            background-color: #555;
+            color: white;
+            border: 1px solid #777;
+        }
+        .dark-mode-toggle-btn:hover {
+            background-color: #666;
+        }
+        body.dark-mode .dark-mode-toggle-btn {
+            background-color: #bbb;
+            color: #333;
+            border: 1px solid #999;
+        }
+        body.dark-mode .dark-mode-toggle-btn:hover {
+            background-color: #ccc;
+        }
+
+        /* ======================================= */
+        /* 모바일 반응형 디자인 시작         */
+        /* ======================================= */
+        @media (max-width: 768px) {
+            body {
+                margin: 10px;
+                zoom: 1; /* 모바일에서 화면 축소 제거 */
+                -moz-transform: scale(1); /* Firefox용 */
+                -moz-transform-origin: 0 0; /* Firefox용 */
+            }
+
+            h1 {
+                font-size: 1.8em; /* H1 폰트 크기 조정 */
+            }
+            h2 {
+                font-size: 1.4em; /* H2 폰트 크기 조정 */
+            }
+
+            .container {
+                flex-direction: column; /* 세로로 쌓이도록 변경 */
+                gap: 20px; /* 간격 조정 */
+            }
+
+            .character-manager, .simulation-viewer {
+                padding: 15px; /* 패딩 조정 */
+                flex: 1 1 auto; /* 너비 전체 사용 */
+                min-width: unset; /* 최소 너비 제한 해제 */
+            }
+
+            .form-group input[type="text"],
+            .form-group input[type="number"],
+            .form-group select {
+                width: calc(100% - 20px); /* 폼 너비 조정 */
+                font-size: 0.95em; /* 폰트 크기 조정 */
+                padding: 8px; /* 패딩 조정 */
+            }
+
+            button {
+                padding: 8px 15px; /* 버튼 패딩 조정 */
+                font-size: 0.9em; /* 버튼 폰트 크기 조정 */
+                margin-left: 5px; /* 버튼 간격 조정 */
+            }
+            button.secondary {
+                margin-left: 5px; /* 버튼 간격 조정 */
+            }
+            .character-list-header {
+                flex-direction: column; /* 세로로 쌓이도록 변경 */
+                align-items: flex-start; /* 왼쪽 정렬 */
+                gap: 10px;
+            }
+            .character-list-header button {
+                width: 100%; /* 전체 너비 사용 */
+                margin-left: 0; /* 마진 초기화 */
+            }
+
+            .character-item {
+                flex-direction: column; /* 세로로 쌓이도록 변경 */
+                align-items: flex-start;
+                gap: 5px; /* 항목 간 간격 */
+                padding: 10px;
+            }
+            .character-item span {
+                width: 100%; /* 너비 전체 사용 */
+                margin-right: 0;
+            }
+            .character-item div { /* 버튼 묶음 */
+                width: 100%;
+                display: flex;
+                justify-content: flex-end; /* 버튼 오른쪽 정렬 */
+                margin-top: 10px; /* 버튼 위 여백 */
+            }
+            .character-item button {
+                flex-grow: 1; /* 버튼이 공간을 채우도록 */
+                margin-left: 5px;
+            }
+            .character-item button:first-child {
+                margin-left: 0;
+            }
+
+            .simulation-output {
+                min-height: 300px; /* 시뮬레이션 출력 최소 높이 조정 */
+                max-height: 500px; /* 최대 높이 조정 */
+                padding: 10px;
+            }
+
+            .simulation-event button {
+                display: block; /* 버튼을 블록 요소로 만들어 한 줄에 하나씩 */
+                width: 100%; /* 너비 전체 사용 */
+                margin-left: 0; /* 마진 초기화 */
+                margin-top: 10px; /* 위 여백 */
+            }
+            .simulation-event button:first-of-type {
+                margin-top: 0; /* 첫 번째 버튼은 위 여백 없음 */
+            }
+
+            .round-toggle-container {
+                display: flex; /* 가로 정렬 유지 */
+                flex-wrap: wrap; /* 내용이 넘치면 다음 줄로 */
+                margin-left: 0;
+                margin-top: 10px; /* 제목 아래로 여백 */
+                width: 100%; /* 전체 너비 사용 */
+                justify-content: center; /* 가운데 정렬 */
+            }
+            .round-toggle-container span {
+                margin-bottom: 5px; /* 텍스트와 버튼 사이 여백 */
+            }
+            .round-toggle-btn {
+                flex-grow: 1; /* 버튼이 공간을 채우도록 */
+                max-width: 120px; /* 너무 커지지 않도록 최대 너비 설정 */
+            }
+
+            .data-transfer-section {
+                padding: 15px;
+            }
+            .data-transfer-section button {
+                display: block;
+                width: 100%;
+                margin: 5px 0; /* 상하 마진만 적용 */
+            }
+
+            /* 다크모드 토글 버튼 모바일 위치 조정 */
+            .dark-mode-toggle-container {
+                position: static; /* 상대적인 위치로 변경 */
+                margin-bottom: 20px; /* 아래 여백 */
+                display: flex;
+                flex-direction: column; /* 세로로 쌓이도록 */
+                align-items: flex-end; /* 오른쪽 정렬 */
+                width: 100%;
+            }
+            .dark-mode-toggle-btn {
+                width: auto; /* 내용에 맞춰 너비 조정 */
+                margin-top: 10px; /* 텍스트 아래 여백 */
+            }
         }
     </style>
 </head>
 <body>
+
+    <div class="dark-mode-toggle-container">
+        <span id="darkModeToggleText">다크 모드: OFF</span>
+        <button id="darkModeToggleButton" class="dark-mode-toggle-btn" onclick="toggleDarkMode()">ON/OFF</button>
+    </div>
 
     <h1>행동 계산기</h1>
 
@@ -301,7 +579,7 @@
                 <p>현재 캐릭터 및 라운드 이벤트 데이터를 파일로 저장하거나 URL로 공유할 수 있습니다.</p>
                 <button class="primary" onclick="saveDataAsFile()">데이터 파일로 저장</button>
                 <input type="file" id="loadFileInput" accept=".json" style="display: none;" onchange="loadDataFromFile(event)">
-                <button class="primary" onclick="document.getElementById('loadFileInput').click()">데이터 파일 불러오기</button>
+                <button class="primary" onclick="document.getElementById('loadFileInput').click()">데이터 파일 불러오기">데이터 파일 불러오기</button>
                 <span id="loadStatus" style="margin-left: 10px; color: #888; font-size: 0.9em;"></span>
                 <br><br>
                 <button class="primary" onclick="updateShareableUrl()">URL로 데이터 공유</button>
@@ -330,6 +608,46 @@
             { value: 4, label: "4턴" },
             { value: 5, label: "5턴" }
         ];
+
+        // --- 다크 모드 기능 추가 ---
+        let isDarkMode = false; // 기본값은 라이트 모드 (초기 로드 시 시스템 설정 또는 저장된 설정에 따라 변경됨)
+
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            applyDarkModeSetting();
+            localStorage.setItem('darkModeEnabled', isDarkMode); // 로컬 스토리지에 설정 저장
+        }
+
+        function applyDarkModeSetting() {
+            const body = document.body;
+            const toggleButton = document.getElementById('darkModeToggleButton');
+            const toggleText = document.getElementById('darkModeToggleText');
+
+            if (isDarkMode) {
+                body.classList.add('dark-mode');
+                toggleText.textContent = '다크 모드: ON';
+            } else {
+                body.classList.remove('dark-mode');
+                toggleText.textContent = '다크 모드: OFF';
+            }
+        }
+
+        // 페이지 로드 시 로컬 스토리지 또는 시스템 설정에서 다크 모드 설정 불러오기
+        function loadDarkModeSetting() {
+            const savedSetting = localStorage.getItem('darkModeEnabled');
+            if (savedSetting !== null) {
+                // localStorage에 저장된 설정이 있으면 그 설정을 따름
+                isDarkMode = JSON.parse(savedSetting);
+            } else {
+                // localStorage에 설정이 없으면 시스템 테마 설정 확인
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    isDarkMode = true; // 시스템 테마가 다크 모드이면 다크 모드 활성화
+                } else {
+                    isDarkMode = false; // 시스템 테마가 라이트 모드이면 라이트 모드 활성화
+                }
+            }
+            applyDarkModeSetting(); // 설정 적용
+        }
 
         // --- 데이터 저장/불러오기 기능 (기존과 동일) ---
 
@@ -577,6 +895,7 @@
                 runSimulation(); 
                 alert('모든 캐릭터와 라운드 이벤트가 초기화되었습니다.');
 
+                // 새로 추가할 부분: URL에서 데이터 쿼리 파라미터 제거
                 const baseUrl = window.location.origin + window.location.pathname;
                 window.history.replaceState({}, '', baseUrl); 
             }
@@ -833,6 +1152,7 @@
                         <div class="character-turn">[${turnCount}] ${nextChar.name} (${nextChar.currentSpeed} 속도) ${currentGlobalAV.toFixed(2)}av</div>
                         <button class="primary" onclick="showTurnEventForm('form-${turnId}', '${nextChar.id}', ${currentGlobalAV.toFixed(2)}, ${turnCount})">이벤트 추가</button>
                         <div id="form-${turnId}" class="event-form">
+                            <h3>턴 이벤트 추가</h3>
                             <div class="form-group">
                                 <label>대상:</label>
                                 <select id="target-${turnId}">
@@ -1026,7 +1346,7 @@
         function applyFutureRoundEventsToSimState(currentRound, outputDiv) {
             const eventsForThisRound = futureEvents.filter(e => e.type === 'round' && e.roundNum === currentRound);
             if (eventsForThisRound.length > 0) {
-                outputDiv.innerHTML += `<div class="event-detail" style="background-color: #ffe0b2; border: 1px solid #ffcc80;">라운드 ${currentRound} 시작 이벤트:</div>`;
+                outputDiv.innerHTML += `<div class="event-detail" style="background-color: var(--alert-round-event-bg); border: 1px solid var(--alert-round-event-border);">라운드 ${currentRound} 시작 이벤트:</div>`;
                 eventsForThisRound.forEach(event => {
                     applyFutureEventToSimState(event, outputDiv, null); // 라운드 이벤트는 uiTurnId가 없음
                 });
@@ -1041,8 +1361,8 @@
 
             if (event.type === 'round') {
                 // 라운드 이벤트는 라운드 마커 아래에 직접 추가
-                eventOutput.style.backgroundColor = '#fff3e0'; 
-                eventOutput.style.borderColor = '#ffcc80'; 
+                eventOutput.style.backgroundColor = 'var(--sim-round-event-bg)'; 
+                eventOutput.style.borderColor = 'var(--sim-round-event-border)'; 
                 outputDiv.appendChild(eventOutput);
             } else if (event.type === 'turn' && uiTurnId) {
                 // 턴 이벤트는 해당 턴의 simulation-event div 안에 추가
@@ -1124,17 +1444,17 @@
                 form.classList.add('active'); // 폼 활성화
 
                 // 폼 필드 초기화 및 값 설정
-                const targetSelect = document.getElementById(`target-${formId.replace('form-','')}`); 
+                const targetSelect = form.querySelector('[id^="target-"]'); 
                 targetSelect.innerHTML = `<option value="all">모든 캐릭터</option>` +
                     characters.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); // 캐릭터 목록 옵션 채우기
                 targetSelect.value = charId; // 현재 턴을 잡은 캐릭터가 기본 선택
 
-                document.getElementById(`eventType-${formId.replace('form-','')}`).value = 'gauge';
-                document.getElementById(`value-${formId.replace('form-','')}`).value = '';
-                const buffDurationSelect = document.getElementById(`buffDuration-${formId.replace('form-','')}`);
+                form.querySelector('[id^="eventType-"]').value = 'gauge';
+                form.querySelector('[id^="value-"]').value = '';
+                const buffDurationSelect = form.querySelector('[id^="buffDuration-"]');
                 buffDurationSelect.innerHTML = BUFF_DURATION_OPTIONS.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
                 buffDurationSelect.value = '0'; // 기본값 설정
-                document.getElementById(`isHold-${formId.replace('form-','')}`).checked = false;
+                form.querySelector('[id^="isHold-"]').checked = false;
 
                 toggleBuffDuration(formId); // 버프 지속 시간 필드 표시/숨김
             }
@@ -1159,11 +1479,14 @@
 
         // 턴 이벤트 적용 (futureEvents 배열에 저장)
         function applyTurnEvent(turnId, actingCharId, currentAv, turnNum) { 
-            const targetId = document.getElementById(`target-${turnId}`).value;
-            const eventType = document.getElementById(`eventType-${turnId}`).value;
-            let valueInput = document.getElementById(`value-${turnId}`).value; 
-            const isHold = document.getElementById(`isHold-${turnId}`).checked;
-            const buffDuration = parseInt(document.getElementById(`buffDuration-${turnId}`).value);
+            const form = document.getElementById(`form-${turnId}`); // 해당 폼 요소 가져오기
+            if (!form) return;
+
+            const targetId = form.querySelector('[id^="target-"]').value;
+            const eventType = form.querySelector('[id^="eventType-"]').value;
+            let valueInput = form.querySelector('[id^="value-"]').value; 
+            const isHold = form.querySelector('[id^="isHold-"]').checked;
+            const buffDuration = parseInt(form.querySelector('[id^="buffDuration-"]').value);
 
             let value;
             let valueType = ''; 
@@ -1225,6 +1548,7 @@
 
         // 페이지 로드 시 초기화 및 시뮬레이션 실행
         window.onload = () => {
+            loadDarkModeSetting(); // 다크 모드 설정 먼저 로드
             renderCharacterList(); // 캐릭터 목록 렌더링
             updateRoundToggleButtonUI(); // 라운드 표시 버튼 UI 업데이트
             loadDataFromUrl(); // URL에서 데이터 불러오기 시도

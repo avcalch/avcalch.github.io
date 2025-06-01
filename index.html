@@ -99,8 +99,8 @@
             background-color: var(--body-bg);
             color: var(--text-color);
             /* 데스크톱 환경에서만 zoom 적용. 모바일에서는 viewport meta tag가 처리 */
-            zoom: 0.7; 
-            -moz-transform: scale(0.7); 
+            zoom: 0.8; 
+            -moz-transform: scale(0.8); 
             -moz-transform-origin: 0 0; 
             transition: background-color 0.3s ease, color 0.3s ease;
         }
@@ -579,7 +579,7 @@
                 <p>현재 캐릭터 및 라운드 이벤트 데이터를 파일로 저장하거나 URL로 공유할 수 있습니다.</p>
                 <button class="primary" onclick="saveDataAsFile()">데이터 파일로 저장</button>
                 <input type="file" id="loadFileInput" accept=".json" style="display: none;" onchange="loadDataFromFile(event)">
-                <button class="primary" onclick="document.getElementById('loadFileInput').click()">데이터 파일 불러오기">데이터 파일 불러오기</button>
+                <button class="primary" onclick="document.getElementById('loadFileInput').click()">데이터 파일 불러오기</button>
                 <span id="loadStatus" style="margin-left: 10px; color: #888; font-size: 0.9em;"></span>
                 <br><br>
                 <button class="primary" onclick="updateShareableUrl()">URL로 데이터 공유</button>

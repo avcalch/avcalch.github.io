@@ -119,8 +119,8 @@
             background-color: var(--body-bg);
             color: var(--text-color);
             /* 데스크톱 환경에서만 zoom 적용. 모바일에서는 viewport meta tag가 처리 */
-            zoom: 0.8; 
-            -moz-transform: scale(0.8); 
+            zoom: 0.7; 
+            -moz-transform: scale(0.7); 
             -moz-transform-origin: 0 0; 
             transition: background-color 0.3s ease, color 0.3s ease;
         }
@@ -681,7 +681,8 @@
         // 모든 라운드 및 턴 이벤트를 저장하는 새로운 전역 배열
         let futureEvents = JSON.parse(localStorage.getItem('futureEvents')) || []; 
         // 시뮬레이션 종료 지점 (이벤트 추가 시 설정되며, runSimulation에 전달)
-        let simulationEndTurn = Infinity; // 항상 초기화됨
+        // 이 값은 resetSimulationState에서만 Infinity로 초기화되고, endSimulationFromTurn에서만 변경됩니다.
+        let simulationEndTurn = JSON.parse(localStorage.getItem('simulationEndTurn')) || Infinity; 
 
         const BUFF_DURATION_OPTIONS = [
             { value: 0, label: "지속 시간 없음 (영구)" }, 
@@ -737,7 +738,8 @@
         function saveDataAsFile() {
             const dataToSave = {
                 characters: characters,
-                futureEvents: futureEvents
+                futureEvents: futureEvents,
+                simulationEndTurn: simulationEndTurn // 시뮬레이션 종료 지점도 저장
             };
             const jsonString = JSON.stringify(dataToSave, null, 2); 
 
@@ -771,9 +773,12 @@
                         
                         characters = loadedData.characters;
                         futureEvents = loadedData.futureEvents;
+                        // simulationEndTurn이 있다면 로드, 없으면 Infinity
+                        simulationEndTurn = loadedData.simulationEndTurn !== undefined ? loadedData.simulationEndTurn : Infinity;
 
                         localStorage.setItem('characters', JSON.stringify(characters));
                         localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
+                        localStorage.setItem('simulationEndTurn', JSON.stringify(simulationEndTurn));
 
                         renderCharacterList(); 
                         runSimulation();      
@@ -836,7 +841,8 @@
         async function updateShareableUrl() { // 비동기 함수로 변경
             const dataToShare = {
                 characters: characters,
-                futureEvents: futureEvents
+                futureEvents: futureEvents,
+                simulationEndTurn: simulationEndTurn // 시뮬레이션 종료 지점도 공유 데이터에 포함
             };
             const jsonString = JSON.stringify(dataToShare);
 
@@ -899,9 +905,13 @@
                             ...event,
                             id: event.id || Date.now().toString() + Math.random().toString().substring(2, 8) // 고유 ID 부여
                         }));
+                        // simulationEndTurn이 있다면 로드, 없으면 Infinity
+                        simulationEndTurn = loadedData.simulationEndTurn !== undefined ? loadedData.simulationEndTurn : Infinity;
+
 
                         localStorage.setItem('characters', JSON.stringify(characters));
                         localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
+                        localStorage.setItem('simulationEndTurn', JSON.stringify(simulationEndTurn)); // 로드된 값 저장
 
                         renderCharacterList();
                         // runSimulation()은 이 함수가 완료된 후 window.onload에서 호출됩니다.
@@ -977,6 +987,8 @@
                 localStorage.setItem('characters', JSON.stringify(characters)); 
                 futureEvents = []; // futureEvents 초기화
                 localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
+                simulationEndTurn = Infinity; // 시뮬레이션 종료 지점도 초기화
+                localStorage.setItem('simulationEndTurn', JSON.stringify(simulationEndTurn));
                 renderCharacterList(); 
                 clearCharacterForm(); 
                 runSimulation(); 
@@ -1021,8 +1033,8 @@
                 characters.push(newChar);
             }
             localStorage.setItem('characters', JSON.stringify(characters));
-            renderCharacterList();
             runSimulation(); 
+            renderCharacterList(); // runSimulation 후에 렌더링 호출 (게이지 초기화 등 반영)
         }
 
         function editCharacter(id) {
@@ -1055,9 +1067,10 @@
                     char.currentGauge = 0; // 게이지는 초기화
                 });
                 futureEvents = []; // 모든 이벤트 초기화
+                simulationEndTurn = Infinity; // 시뮬레이션 종료 지점 초기화
                 localStorage.setItem('characters', JSON.stringify(characters));
                 localStorage.setItem('futureEvents', JSON.stringify(futureEvents)); 
-                simulationEndTurn = Infinity; // 시뮬레이션 종료 지점 초기화
+                localStorage.setItem('simulationEndTurn', JSON.stringify(simulationEndTurn)); // 저장
                 runSimulation(); 
             }
         }
@@ -1094,22 +1107,32 @@
 
         // 시뮬레이션 종료 지점까지 futureEvents를 정리하는 함수
         function cleanUpFutureEvents() {
+            if (simulationEndTurn === Infinity) return; // Infinity면 정리할 필요 없음
+
             const originalFutureEventsCount = futureEvents.length;
-            futureEvents = futureEvents.filter(event => {
+            const tempFutureEvents = [];
+
+            // 턴 이벤트: simulationEndTurn보다 같거나 작은 턴 번호만 유지
+            // 라운드 이벤트: simulationEndTurn까지 도달할 수 있는 라운드만 유지
+            // 주의: 라운드 이벤트는 턴 번호가 아닌 라운드 번호 기준이며, 턴이 끝나는 시점에 해당 라운드 번호가 시작될 수 있음.
+            // 가장 보수적으로, 시뮬레이션 종료 턴에 해당하는 라운드까지는 유지합니다.
+            const maxRoundAtEndTurn = getRound(simulationEndTurn * (currentSimState.length > 0 ? currentSimState[0].currentSpeed : 100) / 100); // 대략적인 AV 계산
+            
+            futureEvents.forEach(event => {
                 if (event.type === 'turn') {
-                    // 턴 이벤트는 simulationEndTurn보다 크면 삭제
-                    return event.turnNum <= simulationEndTurn;
+                    if (event.turnNum <= simulationEndTurn) {
+                        tempFutureEvents.push(event);
+                    }
+                } else if (event.type === 'round') {
+                    // 라운드 이벤트는 해당 라운드 시작 AV가 종료 턴의 AV보다 작거나 같으면 유지
+                    // 여기서는 단순히 라운드 번호만 비교합니다.
+                    if (event.roundNum <= maxRoundAtEndTurn + 1) { // 종료 턴의 다음 라운드까지는 허용 (시작 이벤트일 수 있으므로)
+                        tempFutureEvents.push(event);
+                    }
                 }
-                // 라운드 이벤트는 턴 수에 따라 삭제하지 않음 (시뮬레이션 끝이 라운드 중간일 수도 있기 때문)
-                // 하지만 시뮬레이션 끝 이후의 라운드 이벤트는 필요 없으므로, 해당 라운드의 시작 AV를 기준으로 정리
-                if (event.type === 'round') {
-                    // 예: 시뮬레이션이 100AV에서 끝났는데, 2라운드 시작(150AV) 이벤트가 있다면 삭제
-                    // 좀 더 정확하게는 simulationEndTurn에서 발생할 수 있는 가장 마지막 라운드보다 큰 라운드 이벤트 삭제
-                    const endRound = getRound(simulationEndTurn * (currentSimState.length > 0 ? currentSimState[0].currentSpeed : 100)); // 대략적인 AV 계산
-                    return event.roundNum <= endRound;
-                }
-                return true; 
             });
+            futureEvents = tempFutureEvents;
+
             if (futureEvents.length !== originalFutureEventsCount) {
                 localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
                 console.log(`시뮬레이션 종료 지점 이후의 이벤트 ${originalFutureEventsCount - futureEvents.length}개가 제거되었습니다.`);
@@ -1127,15 +1150,11 @@
         }
 
         function runSimulation() {
-            simulationEndTurn = Infinity; // 시뮬레이션 시작 시 항상 초기화
-
             const outputDiv = document.getElementById('simulationOutput');
             outputDiv.innerHTML = ''; 
 
             if (characters.length === 0) {
                 outputDiv.innerHTML = '<p>시뮬레이션을 실행하려면 캐릭터를 추가해주세요.</p>';
-                // 캐릭터가 없어도 시뮬레이션 끝 마커를 표시할 수 있지만,
-                // 여기서는 시뮬레이션 자체가 실행되지 않으므로 마커를 표시하지 않습니다.
                 return;
             }
 
@@ -1187,6 +1206,12 @@
             applyFutureRoundEventsToSimState(0, outputDiv); // 0 라운드 futureEvents 적용
 
             while (turnCount < MAX_TURNS) {
+                // 시뮬레이션 강제 종료 지점에 도달하면 중단
+                if (turnCount >= simulationEndTurn) { 
+                    cleanUpFutureEvents(); // 종료된 턴 이후의 이벤트 정리
+                    break; 
+                }
+
                 // 턴 시작 시점에 pendingBuffs를 실제 buffs로 이동하고, 지속 시간 감소
                 currentSimState.forEach(char => {
                     // pendingBuffs를 현재 buffs에 추가
@@ -1239,14 +1264,6 @@
                 currentGlobalAV += minTimeNeeded; // 전체 AV 업데이트
                 turnCount++; // 여기서 턴 카운트를 증가시킵니다.
 
-                // 시뮬레이션 강제 종료 지점에 도달하면 중단
-                if (turnCount > simulationEndTurn) { // turnCount가 simulationEndTurn보다 커지면 종료
-                    // outputDiv.innerHTML += `<div class="simulation-event">시뮬레이션이 ${turnCount}턴에서 종료되었습니다.</div>`; // 이 부분은 이제 아래에서 일괄 처리
-                    cleanUpFutureEvents(); // 종료된 턴 이후의 이벤트 정리
-                    break; 
-                }
-
-
                 // 라운드 변경 감지 및 마커 출력
                 const newRound = getRound(currentGlobalAV);
                 if (newRound > currentRound) {
@@ -1280,50 +1297,53 @@
 
                 // 턴 기록 출력
                 const turnId = `turn-${nextChar.id}-${turnCount}`; // 각 턴 이벤트 폼의 고유 ID를 위한 조합
-                outputDiv.innerHTML += `
-                    <div class="simulation-event" id="sim-event-${turnId}">
-                        <div class="character-turn">[${turnCount}] ${nextChar.name} (${nextChar.currentSpeed} 속도) ${currentGlobalAV.toFixed(2)}av</div>
-                        <button class="primary" onclick="showTurnEventForm('form-${turnId}', '${nextChar.id}', ${currentGlobalAV.toFixed(2)}, ${turnCount})">이벤트 추가</button>
-                        <div id="form-${turnId}" class="event-form">
-                            <h3>턴 이벤트 추가</h3>
-                            <div class="form-group">
-                                <label for="eventName-${turnId}">이벤트 이름 (선택 사항):</label>
-                                <input type="text" id="eventName-${turnId}" placeholder="예: '브로냐 궁극기', '적 디버프'">
-                            </div>
-                            <div class="form-group">
-                                <label>대상:</label>
-                                <select id="target-${turnId}">
-                                    <option value="all">모든 캐릭터</option>
-                                    ${characters.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>이벤트 종류:</label>
-                                <select id="eventType-${turnId}" onchange="toggleBuffDuration('form-${turnId}')">
-                                    <option value="gauge">행동 게이지 증가 (%)</option>
-                                    <option value="speed">속도 변동 (%, 고정 속도)</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="value-${turnId}">값:</label>
-                                <input type="text" id="value-${turnId}" placeholder="값 (예: 20, 10%)" required> 
-                            </div>
-                            <div class="form-group" id="buffDurationGroup-${turnId}" style="display:none;">
-                                <label for="buffDuration-${turnId}">버프 지속 시간 (턴):</label>
-                                <select id="buffDuration-${turnId}">
-                                    ${BUFF_DURATION_OPTIONS.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <input type="checkbox" id="isHold-${turnId}">
-                                <label for="isHold-${turnId}">홀드 상태에서 발동</label>
-                            </div>
-                            <button class="primary" onclick="applyTurnEvent('${turnId}', '${nextChar.id}', ${currentGlobalAV.toFixed(2)}, ${turnCount})">적용</button>
-                            <button class="secondary" onclick="document.getElementById('form-${turnId}').classList.remove('active');">닫기</button>
-                            <button class="tertiary" onclick="endSimulationFromTurn(${turnCount});">이 시뮬레이션 끝내기</button>
+                const turnEventDiv = document.createElement('div');
+                turnEventDiv.className = 'simulation-event';
+                turnEventDiv.id = `sim-event-${turnId}`;
+                turnEventDiv.innerHTML = `
+                    <div class="character-turn">[${turnCount}] ${nextChar.name} (${nextChar.currentSpeed} 속도) ${currentGlobalAV.toFixed(2)}av</div>
+                    <button class="primary" onclick="showTurnEventForm('form-${turnId}', '${nextChar.id}', ${currentGlobalAV.toFixed(2)}, ${turnCount})">이벤트 추가</button>
+                    <div id="form-${turnId}" class="event-form">
+                        <h3>턴 이벤트 추가</h3>
+                        <div class="form-group">
+                            <label for="eventName-${turnId}">이벤트 이름 (선택 사항):</label>
+                            <input type="text" id="eventName-${turnId}" placeholder="예: '브로냐 궁극기', '적 디버프'">
                         </div>
+                        <div class="form-group">
+                            <label>대상:</label>
+                            <select id="target-${turnId}">
+                                <option value="all">모든 캐릭터</option>
+                                ${characters.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>이벤트 종류:</label>
+                            <select id="eventType-${turnId}" onchange="toggleBuffDuration('form-${turnId}')">
+                                <option value="gauge">행동 게이지 증가 (%)</option>
+                                <option value="speed">속도 변동 (%, 고정 속도)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="value-${turnId}">값:</label>
+                            <input type="text" id="value-${turnId}" placeholder="값 (예: 20, 10%)" required> 
+                        </div>
+                        <div class="form-group" id="buffDurationGroup-${turnId}" style="display:none;">
+                            <label for="buffDuration-${turnId}">버프 지속 시간 (턴):</label>
+                            <select id="buffDuration-${turnId}">
+                                ${BUFF_DURATION_OPTIONS.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <input type="checkbox" id="isHold-${turnId}">
+                            <label for="isHold-${turnId}">홀드 상태에서 발동</label>
+                        </div>
+                        <button class="primary" onclick="applyTurnEvent('${turnId}', '${nextChar.id}', ${currentGlobalAV.toFixed(2)}, ${turnCount})">적용</button>
+                        <button class="secondary" onclick="document.getElementById('form-${turnId}').classList.remove('active');">닫기</button>
+                        <button class="tertiary" onclick="endSimulationFromTurn(${turnCount});">이 시뮬레이션 끝내기</button>
                     </div>
                 `;
+                outputDiv.appendChild(turnEventDiv);
+
 
                 // **현재 턴에 해당하는 futureEvents를 찾아서 currentSimState에 적용합니다.**
                 // 홀드 이벤트 먼저, 그 다음 턴 종료 후 이벤트.
@@ -1340,30 +1360,54 @@
             
             // 시뮬레이션이 MAX_TURNS에 도달했거나 simulationEndTurn에 의해 종료되었을 때
             // 항상 "시뮬레이션 끝" 마커와 마지막 라운드 끝 마커를 표시
-            if (showRoundMarkers) { // 라운드 마커 표시가 활성화된 경우에만
-                // 마지막 라운드 끝 마커를 명시적으로 추가
-                // 현재 currentRound 값보다 큰 라운드 마커가 이미 그려져 있다면 중복해서 그리지 않음
-                const lastRoundMarker = document.getElementById(`round-marker-${currentRound}`);
-                if (lastRoundMarker && !lastRoundMarker.outerHTML.includes('라운드 끝')) {
+
+            // 1. 라운드 마커 표시가 활성화된 경우, 마지막 라운드 끝 마커 추가
+            if (showRoundMarkers) { 
+                // 마지막으로 그려진 라운드 마커가 '시작' 마커였다면 '끝' 마커를 추가
+                const lastRoundMarkerElement = outputDiv.lastElementChild;
+                if (lastRoundMarkerElement && lastRoundMarkerElement.classList.contains('round-marker') && lastRoundMarkerElement.innerHTML.includes('라운드 시작')) {
                     const endRoundDiv = document.createElement('div');
-                    endRoundDiv.classList.add('round-marker');
-                    endRoundDiv.innerHTML = `<span class="marker-text">${currentRound} 라운드 끝</span>`;
-                    outputDiv.appendChild(endRoundDiv);
-                } else if (!lastRoundMarker && currentRound > 0) { // 0라운드 외의 경우 라운드 마커가 없으면 추가
-                     const endRoundDiv = document.createElement('div');
                     endRoundDiv.classList.add('round-marker');
                     endRoundDiv.innerHTML = `<span class="marker-text">${currentRound} 라운드 끝</span>`;
                     outputDiv.appendChild(endRoundDiv);
                 }
             }
-            // "시뮬레이션 끝" 마커는 항상 추가 (시뮬레이션이 끝났음을 명확히 표시)
-            outputDiv.innerHTML += `<div class="simulation-end-marker"><span class="marker-text">시뮬레이션 끝 (${turnCount}턴)</span></div>`;
+            
+            // 2. "시뮬레이션 끝" 마커를 정확한 위치에 추가
+            const simEndMarker = document.createElement('div');
+            simEndMarker.classList.add('simulation-end-marker');
+            simEndMarker.innerHTML = `<span class="marker-text">시뮬레이션 끝 (${turnCount}턴)</span>`;
+
+            if (simulationEndTurn !== Infinity) {
+                // 특정 턴에서 시뮬레이션을 끝냈다면, 해당 턴 마커 바로 다음에 삽입
+                const targetTurnElement = document.getElementById(`sim-event-turn-${characters.find(c => c.id === currentSimState[0].id)?.id || ''}-${simulationEndTurn}`);
+                // 정확한 캐릭터 ID를 알 수 없으므로, sim-event-${turnId} 패턴을 따르는 마지막 요소를 찾습니다.
+                let lastSimEvent = null;
+                for (let i = outputDiv.children.length - 1; i >= 0; i--) {
+                    if (outputDiv.children[i].classList.contains('simulation-event')) {
+                        lastSimEvent = outputDiv.children[i];
+                        break;
+                    }
+                }
+
+                if (lastSimEvent) {
+                    outputDiv.insertBefore(simEndMarker, lastSimEvent.nextSibling);
+                } else {
+                    // 마지막 턴 이벤트가 없으면 (예: 0턴 종료), 그냥 맨 뒤에 추가
+                    outputDiv.appendChild(simEndMarker);
+                }
+            } else {
+                // MAX_TURNS에 도달하여 종료되었거나, 아무 이벤트 없이 시뮬레이션이 종료된 경우
+                outputDiv.appendChild(simEndMarker);
+            }
         }
+
 
         // 특정 턴에서 시뮬레이션을 끝내고 futureEvents를 정리
         function endSimulationFromTurn(turnNum) {
             if (confirm(`${turnNum}턴 이후의 모든 시뮬레이션 결과 및 저장된 이벤트를 삭제하고 시뮬레이션을 종료하시겠습니까?`)) {
                 simulationEndTurn = turnNum; // 시뮬레이션 종료 지점 설정
+                localStorage.setItem('simulationEndTurn', JSON.stringify(simulationEndTurn)); // 로컬 스토리지에 저장
                 runSimulation(); // 시뮬레이션을 다시 실행하여 해당 지점까지의 결과만 표시
                 alert(`${turnNum}턴 이후의 시뮬레이션이 종료되고, 해당 턴 이후의 이벤트가 제거되었습니다.`);
             }

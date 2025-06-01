@@ -680,7 +680,7 @@
         ];
 
         // --- 다크 모드 기능 추가 ---
-        let isDarkMode = true; // 기본값은 라이트 모드 (초기 로드 시 시스템 설정 또는 저장된 설정에 따라 변경됨)
+        let isDarkMode = false; // 기본값은 라이트 모드 (초기 로드 시 시스템 설정 또는 저장된 설정에 따라 변경됨)
 
         function toggleDarkMode() {
             isDarkMode = !isDarkMode;
@@ -1408,6 +1408,7 @@
             buffDurationSelect.innerHTML = BUFF_DURATION_OPTIONS.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
             buffDurationSelect.value = '0'; // 기본값 설정
 
+            // **여기서 toggleBuffDuration 함수를 호출합니다.**
             toggleBuffDuration('roundEventFormContainer'); // 버프 지속 시간 필드 표시/숨김
         }
 

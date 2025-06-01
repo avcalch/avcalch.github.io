@@ -50,6 +50,9 @@
             --alert-round-event-border: #ffcc80; /* 라운드 이벤트 알림 테두리색 */
             --sim-round-event-bg: #fff3e0; /* 시뮬레이션 내 라운드 이벤트 배경색 */
             --sim-round-event-border: #ffcc80; /* 시뮬레이션 내 라운드 이벤트 테두리색 */
+            --cancel-button-bg: #ffc107; /* 취소 버튼 색상 */
+            --cancel-button-hover-bg: #e0a800;
+            --cancel-button-color: #333;
         }
 
         /* 다크 모드 스타일 */
@@ -96,6 +99,9 @@
             --alert-round-event-border: #c98e5e; /* 라운드 이벤트 알림 테두리색 (다크모드용) */
             --sim-round-event-bg: #8a6a4a; /* 시뮬레이션 내 라운드 이벤트 배경색 (다크모드용) */
             --sim-round-event-border: #b89868; /* 시뮬레이션 내 라운드 이벤트 테두리색 (다크모드용) */
+            --cancel-button-bg: #b8860b; /* 취소 버튼 색상 (다크모드) */
+            --cancel-button-hover-bg: #a0740a;
+            --cancel-button-color: #fff;
         }
 
         /* 공통 스타일: CSS 변수 사용 */
@@ -105,8 +111,8 @@
             background-color: var(--body-bg);
             color: var(--text-color);
             /* 데스크톱 환경에서만 zoom 적용. 모바일에서는 viewport meta tag가 처리 */
-            zoom: 0.8; 
-            -moz-transform: scale(0.8); 
+            zoom: 0.7; 
+            -moz-transform: scale(0.7); 
             -moz-transform-origin: 0 0; 
             transition: background-color 0.3s ease, color 0.3s ease;
         }
@@ -185,6 +191,14 @@
         button.tertiary:hover {
             background-color: var(--button-tertiary-hover-bg);
         }
+        button.cancel { /* 취소 버튼 스타일 */
+            background-color: var(--cancel-button-bg);
+            color: var(--cancel-button-color);
+            margin-left: 10px;
+        }
+        button.cancel:hover {
+            background-color: var(--cancel-button-hover-bg);
+        }
 
         #characterList {
             margin-top: 20px;
@@ -257,7 +271,21 @@
             padding: 8px;
             border-radius: 4px;
             border: 1px solid var(--event-detail-border);
+            display: flex; /* Flexbox 추가 */
+            justify-content: space-between; /* 내용과 버튼을 양 끝으로 정렬 */
+            align-items: center; /* 세로 중앙 정렬 */
+            flex-wrap: wrap; /* 내용이 길어질 경우 줄바꿈 */
             transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        .event-detail .event-description-text { /* 이벤트 설명 텍스트를 감싸는 span 추가 */
+            flex-grow: 1; /* 최대한 공간 차지 */
+            margin-right: 10px; /* 버튼과의 간격 */
+        }
+        .event-detail button { /* event-detail 내 버튼 스타일 조정 */
+            padding: 5px 10px;
+            font-size: 0.85em;
+            white-space: nowrap; /* 버튼 텍스트 줄바꿈 방지 */
+            margin-top: 0; /* 기본 마진 제거 */
         }
         .round-marker {
             font-weight: bold;
@@ -447,7 +475,7 @@
                 font-size: 0.9em; /* 버튼 폰트 크기 조정 */
                 margin-left: 5px; /* 버튼 간격 조정 */
             }
-            button.secondary, button.tertiary { /* 추가된 버튼도 모바일 마진 적용 */
+            button.secondary, button.tertiary, button.cancel { /* 추가된 버튼도 모바일 마진 적용 */
                 margin-left: 5px; /* 버튼 간격 조정 */
             }
             .character-list-header {
@@ -499,6 +527,22 @@
             .simulation-event button:first-of-type {
                 margin-top: 0; /* 첫 번째 버튼은 위 여백 없음 */
             }
+            /* .event-detail 내부의 버튼도 모바일에서 세로로 쌓이도록 */
+            .event-detail {
+                flex-direction: column; /* 세로로 쌓이도록 */
+                align-items: flex-start; /* 왼쪽 정렬 */
+                gap: 5px; /* 텍스트와 버튼 간 간격 */
+            }
+            .event-detail .event-description-text {
+                width: 100%; /* 전체 너비 사용 */
+                margin-right: 0; /* 마진 초기화 */
+                margin-bottom: 5px; /* 텍스트 아래 여백 */
+            }
+            .event-detail button {
+                width: 100%; /* 버튼도 전체 너비 사용 */
+                margin-left: 0; /* 마진 초기화 */
+            }
+
 
             .round-toggle-container {
                 display: flex; /* 가로 정렬 유지 */
@@ -837,7 +881,11 @@
                         loadedData.futureEvents && Array.isArray(loadedData.futureEvents)) {
                         
                         characters = loadedData.characters;
-                        futureEvents = loadedData.futureEvents;
+                        // 기존에 id가 없는 이벤트에 id를 부여 (이전 버전 호환성)
+                        futureEvents = loadedData.futureEvents.map(event => ({
+                            ...event,
+                            id: event.id || Date.now().toString() + Math.random().toString().substring(2, 8) // 고유 ID 부여
+                        }));
 
                         localStorage.setItem('characters', JSON.stringify(characters));
                         localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
@@ -1046,6 +1094,15 @@
             }
         }
 
+        // --- 이벤트 취소 함수 추가 ---
+        function cancelEvent(eventId) {
+            if (confirm('이 이벤트를 시뮬레이션에서 제거하시겠습니까?')) {
+                futureEvents = futureEvents.filter(event => event.id !== eventId);
+                localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
+                runSimulation(); // 변경 사항 반영을 위해 시뮬레이션 다시 실행
+                alert('이벤트가 성공적으로 취소되었습니다.');
+            }
+        }
 
         function runSimulation() {
             const outputDiv = document.getElementById('simulationOutput');
@@ -1384,6 +1441,7 @@
             targets.forEach(targetChar => {
                 let eventDescription = ``;
                 let eventData = {
+                    id: Date.now().toString() + Math.random().toString().substring(2, 8), // 고유 ID 부여
                     type: 'round', // 이벤트 타입 명시
                     roundNum: roundNum, 
                     targetId: targetChar.id,
@@ -1421,7 +1479,14 @@
         function applyFutureRoundEventsToSimState(currentRound, outputDiv) {
             const eventsForThisRound = futureEvents.filter(e => e.type === 'round' && e.roundNum === currentRound);
             if (eventsForThisRound.length > 0) {
-                outputDiv.innerHTML += `<div class="event-detail" style="background-color: var(--alert-round-event-bg); border: 1px solid var(--alert-round-event-border);">라운드 ${currentRound} 시작 이벤트:</div>`;
+                // 라운드 이벤트 알림 div는 그대로 유지
+                const roundAlertDiv = document.createElement('div');
+                roundAlertDiv.classList.add('event-detail');
+                roundAlertDiv.style.backgroundColor = 'var(--alert-round-event-bg)'; 
+                roundAlertDiv.style.borderColor = 'var(--alert-round-event-border)'; 
+                roundAlertDiv.innerHTML = `<span class="event-description-text">라운드 ${currentRound} 시작 이벤트:</span>`;
+                outputDiv.appendChild(roundAlertDiv);
+
                 eventsForThisRound.forEach(event => {
                     applyFutureEventToSimState(event, outputDiv, null); // 라운드 이벤트는 uiTurnId가 없음
                 });
@@ -1431,9 +1496,18 @@
         // 새로운 함수: futureEvent 하나를 currentSimState에 적용하고 UI에 표시
         function applyFutureEventToSimState(event, outputDiv, uiTurnId) {
             const eventOutput = document.createElement('div');
-            const eventNameDisplay = event.eventName ? ` [${event.eventName}]` : '';
-            eventOutput.innerHTML = event.description + eventNameDisplay; // 이벤트 이름 추가
+            // 이벤트 고유 ID를 data-event-id 속성으로 추가
+            eventOutput.setAttribute('data-event-id', event.id); 
             eventOutput.classList.add('event-detail');
+
+            const eventNameDisplay = event.eventName ? ` [${event.eventName}]` : '';
+            const descriptionText = `${event.description}${eventNameDisplay}`;
+
+            // 이벤트 설명과 취소 버튼을 감싸는 구조 변경
+            eventOutput.innerHTML = `
+                <span class="event-description-text">${descriptionText}</span>
+                <button class="cancel" onclick="cancelEvent('${event.id}')">이벤트 취소</button>
+            `;
 
             if (event.type === 'round') {
                 // 라운드 이벤트는 라운드 마커 아래에 직접 추가
@@ -1589,6 +1663,7 @@
                 let eventDescription = ``; 
 
                 let eventData = {
+                    id: Date.now().toString() + Math.random().toString().substring(2, 8), // 고유 ID 부여
                     type: 'turn', // 이벤트 타입 명시: 'turn' 또는 'round'
                     turnNum: turnNum, 
                     actingCharId: actingCharId, 

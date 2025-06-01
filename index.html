@@ -53,9 +53,10 @@
             --cancel-button-bg: #ffc107; /* 취소 버튼 색상 */
             --cancel-button-hover-bg: #e0a800;
             --cancel-button-color: #333;
-            --simulation-end-marker-bg: #d4edda; /* 시뮬레이션 끝 마커 배경색 */
-            --simulation-end-marker-border: #28a745; /* 시뮬레이션 끝 마커 테두리색 */
-            --simulation-end-marker-text-color: #155724; /* 시뮬레이션 끝 마커 텍스트 색상 */
+            /* 시뮬레이션 끝 마커 색상 조정 */
+            --simulation-end-marker-bg: #e6ffe6; /* 연한 녹색 계열 */
+            --simulation-end-marker-border: #80c080; /* 더 차분한 녹색 */
+            --simulation-end-marker-text-color: #336633; /* 짙은 녹색 */
         }
 
         /* 다크 모드 스타일 */
@@ -105,9 +106,10 @@
             --cancel-button-bg: #b8860b; /* 취소 버튼 색상 (다크모드) */
             --cancel-button-hover-bg: #a0740a;
             --cancel-button-color: #fff;
-            --simulation-end-marker-bg: #28a745; /* 시뮬레이션 끝 마커 배경색 (다크모드) */
-            --simulation-end-marker-border: #155724; /* 시뮬레이션 끝 마커 테두리색 (다크모드) */
-            --simulation-end-marker-text-color: #d4edda; /* 시뮬레이션 끝 마커 텍스트 색상 (다크모드) */
+            /* 시뮬레이션 끝 마커 색상 조정 (다크 모드) */
+            --simulation-end-marker-bg: #3c5a3c; /* 다크 모드용 더 어두운 녹색 */
+            --simulation-end-marker-border: #6a8a6a; /* 다크 모드용 테두리 */
+            --simulation-end-marker-text-color: #c8e0c8; /* 다크 모드용 밝은 텍스트 */
         }
 
         /* 공통 스타일: CSS 변수 사용 */
@@ -679,7 +681,7 @@
         // 모든 라운드 및 턴 이벤트를 저장하는 새로운 전역 배열
         let futureEvents = JSON.parse(localStorage.getItem('futureEvents')) || []; 
         // 시뮬레이션 종료 지점 (이벤트 추가 시 설정되며, runSimulation에 전달)
-        let simulationEndTurn = Infinity; 
+        let simulationEndTurn = Infinity; // 항상 초기화됨
 
         const BUFF_DURATION_OPTIONS = [
             { value: 0, label: "지속 시간 없음 (영구)" }, 
@@ -1095,13 +1097,22 @@
             const originalFutureEventsCount = futureEvents.length;
             futureEvents = futureEvents.filter(event => {
                 if (event.type === 'turn') {
+                    // 턴 이벤트는 simulationEndTurn보다 크면 삭제
                     return event.turnNum <= simulationEndTurn;
                 }
-                return true; // 라운드 이벤트는 턴 수에 따라 삭제하지 않음
+                // 라운드 이벤트는 턴 수에 따라 삭제하지 않음 (시뮬레이션 끝이 라운드 중간일 수도 있기 때문)
+                // 하지만 시뮬레이션 끝 이후의 라운드 이벤트는 필요 없으므로, 해당 라운드의 시작 AV를 기준으로 정리
+                if (event.type === 'round') {
+                    // 예: 시뮬레이션이 100AV에서 끝났는데, 2라운드 시작(150AV) 이벤트가 있다면 삭제
+                    // 좀 더 정확하게는 simulationEndTurn에서 발생할 수 있는 가장 마지막 라운드보다 큰 라운드 이벤트 삭제
+                    const endRound = getRound(simulationEndTurn * (currentSimState.length > 0 ? currentSimState[0].currentSpeed : 100)); // 대략적인 AV 계산
+                    return event.roundNum <= endRound;
+                }
+                return true; 
             });
             if (futureEvents.length !== originalFutureEventsCount) {
                 localStorage.setItem('futureEvents', JSON.stringify(futureEvents));
-                console.log(`시뮬레이션 종료 지점 이후의 턴 이벤트 ${originalFutureEventsCount - futureEvents.length}개가 제거되었습니다.`);
+                console.log(`시뮬레이션 종료 지점 이후의 이벤트 ${originalFutureEventsCount - futureEvents.length}개가 제거되었습니다.`);
             }
         }
 
@@ -1116,11 +1127,15 @@
         }
 
         function runSimulation() {
+            simulationEndTurn = Infinity; // 시뮬레이션 시작 시 항상 초기화
+
             const outputDiv = document.getElementById('simulationOutput');
             outputDiv.innerHTML = ''; 
 
             if (characters.length === 0) {
                 outputDiv.innerHTML = '<p>시뮬레이션을 실행하려면 캐릭터를 추가해주세요.</p>';
+                // 캐릭터가 없어도 시뮬레이션 끝 마커를 표시할 수 있지만,
+                // 여기서는 시뮬레이션 자체가 실행되지 않으므로 마커를 표시하지 않습니다.
                 return;
             }
 
@@ -1172,16 +1187,6 @@
             applyFutureRoundEventsToSimState(0, outputDiv); // 0 라운드 futureEvents 적용
 
             while (turnCount < MAX_TURNS) {
-                // 시뮬레이션 강제 종료 지점에 도달하면 중단
-                if (turnCount >= simulationEndTurn) {
-                    // outputDiv.innerHTML += `<div class="simulation-event">시뮬레이션이 ${turnCount}턴에서 종료되었습니다.</div>`; // 이 부분은 이제 아래에서 일괄 처리
-                    cleanUpFutureEvents(); // 종료된 턴 이후의 이벤트 정리
-                    // simulationEndTurn = Infinity; // 다음 시뮬레이션을 위해 초기화 (runSimulation 시작 시 초기화)
-                    break; 
-                }
-
-                turnCount++;
-
                 // 턴 시작 시점에 pendingBuffs를 실제 buffs로 이동하고, 지속 시간 감소
                 currentSimState.forEach(char => {
                     // pendingBuffs를 현재 buffs에 추가
@@ -1232,6 +1237,15 @@
                 }
 
                 currentGlobalAV += minTimeNeeded; // 전체 AV 업데이트
+                turnCount++; // 여기서 턴 카운트를 증가시킵니다.
+
+                // 시뮬레이션 강제 종료 지점에 도달하면 중단
+                if (turnCount > simulationEndTurn) { // turnCount가 simulationEndTurn보다 커지면 종료
+                    // outputDiv.innerHTML += `<div class="simulation-event">시뮬레이션이 ${turnCount}턴에서 종료되었습니다.</div>`; // 이 부분은 이제 아래에서 일괄 처리
+                    cleanUpFutureEvents(); // 종료된 턴 이후의 이벤트 정리
+                    break; 
+                }
+
 
                 // 라운드 변경 감지 및 마커 출력
                 const newRound = getRound(currentGlobalAV);
@@ -1327,13 +1341,23 @@
             // 시뮬레이션이 MAX_TURNS에 도달했거나 simulationEndTurn에 의해 종료되었을 때
             // 항상 "시뮬레이션 끝" 마커와 마지막 라운드 끝 마커를 표시
             if (showRoundMarkers) { // 라운드 마커 표시가 활성화된 경우에만
-                // 이미 해당 라운드 끝 마커가 있다면 추가하지 않음 (중복 방지)
-                if (!document.getElementById(`round-marker-${currentRound}`).outerHTML.includes('라운드 끝')) {
-                     outputDiv.innerHTML += `<div class="round-marker"><span class="marker-text">${currentRound} 라운드 끝</span></div>`; 
+                // 마지막 라운드 끝 마커를 명시적으로 추가
+                // 현재 currentRound 값보다 큰 라운드 마커가 이미 그려져 있다면 중복해서 그리지 않음
+                const lastRoundMarker = document.getElementById(`round-marker-${currentRound}`);
+                if (lastRoundMarker && !lastRoundMarker.outerHTML.includes('라운드 끝')) {
+                    const endRoundDiv = document.createElement('div');
+                    endRoundDiv.classList.add('round-marker');
+                    endRoundDiv.innerHTML = `<span class="marker-text">${currentRound} 라운드 끝</span>`;
+                    outputDiv.appendChild(endRoundDiv);
+                } else if (!lastRoundMarker && currentRound > 0) { // 0라운드 외의 경우 라운드 마커가 없으면 추가
+                     const endRoundDiv = document.createElement('div');
+                    endRoundDiv.classList.add('round-marker');
+                    endRoundDiv.innerHTML = `<span class="marker-text">${currentRound} 라운드 끝</span>`;
+                    outputDiv.appendChild(endRoundDiv);
                 }
             }
+            // "시뮬레이션 끝" 마커는 항상 추가 (시뮬레이션이 끝났음을 명확히 표시)
             outputDiv.innerHTML += `<div class="simulation-end-marker"><span class="marker-text">시뮬레이션 끝 (${turnCount}턴)</span></div>`;
-            simulationEndTurn = Infinity; // 시뮬레이션 종료 지점 초기화
         }
 
         // 특정 턴에서 시뮬레이션을 끝내고 futureEvents를 정리
